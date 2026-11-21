@@ -1,0 +1,6 @@
+{
+  "name": "SIAKAD PKBM ANNUR KARISMA",
+  "description": "Sistem Informasi Akademik, Administrasi, dan Pembelajaran PKBM Annur Karisma untuk Program Paket A, Paket B, dan Paket C.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}

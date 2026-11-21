@@ -1,0 +1,1625 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // 1. Global Safety Net (Default Deny)
+    match /{document=**} {
+      allow read, write: if false;
+    }
+
+    // 2. Reusable Global Primitives
+    function isValidId(id) {
+      return id is string && id.size() >= 1 && id.size() <= 128 && id.matches('^[a-zA-Z0-9_\\-]+$');
+    }
+
+    function isValidUsernameId(username) {
+      return username is string && username.size() >= 3 && username.size() <= 40 && username.matches('^[a-z0-9._\\-]+$');
+    }
+
+    function incoming() {
+      return request.resource.data;
+    }
+
+    function existing() {
+      return resource.data;
+    }
+
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function hasUserDoc() {
+      return isSignedIn() && exists(/databases/$(database)/documents/users/$(request.auth.uid));
+    }
+
+    function isActiveAccount() {
+      return hasUserDoc() && get(/databases/$(database)/documents/users/$(request.auth.uid)).data.status == 'Aktif';
+    }
+
+    function getUserRole() {
+      return get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+
+    function isAdmin() {
+      return isActiveAccount() && getUserRole() == 'admin';
+    }
+
+    function isKepala() {
+      return isActiveAccount() && getUserRole() == 'kepala_pkbm';
+    }
+
+    function isTeacher() {
+      return isActiveAccount() && getUserRole() == 'guru';
+    }
+
+    function isStaff() {
+      return isAdmin() || isKepala();
+    }
+
+    function isOptionalString(data, field, maxLen) {
+      return !(field in data) || (data[field] is string && data[field].size() <= maxLen);
+    }
+
+    function isOptionalTimestamp(data, field) {
+      return !(field in data) || data[field] is timestamp;
+    }
+
+    function isValidUidList(listVal, maxItems) {
+      return listVal is list && listVal.size() <= maxItems && (listVal.size() == 0 || listVal[0] is string);
+    }
+
+    // 3. Entity Validation Blueprints (Anti-Update-Gap)
+    function isValidUserProfile(data) {
+      return data.keys().hasAll([
+          'uid', 'username', 'internalEmail', 'name', 'role', 'status', 'authVersion', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'uid', 'username', 'internalEmail', 'name', 'role', 'status', 'authVersion',
+          'nis', 'nip', 'linkedEntityId', 'classLabel', 'avatarUrl', 'lastLoginAt', 'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.uid) &&
+        isValidUsernameId(data.username) &&
+        data.internalEmail is string && data.internalEmail.size() >= 5 && data.internalEmail.size() <= 160 &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 120 &&
+        data.role in ['admin', 'kepala_pkbm', 'guru', 'murid'] &&
+        data.status in ['Aktif', 'Nonaktif'] &&
+        data.authVersion is number && data.authVersion >= 1 && data.authVersion <= 1000 &&
+        isOptionalString(data, 'nis', 32) &&
+        isOptionalString(data, 'nip', 32) &&
+        isOptionalString(data, 'linkedEntityId', 128) &&
+        isOptionalString(data, 'classLabel', 120) &&
+        isOptionalString(data, 'avatarUrl', 120000) &&
+        isOptionalString(data, 'createdBy', 128) &&
+        isOptionalTimestamp(data, 'lastLoginAt') &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidGalleryPhoto(data) {
+      return data.keys().hasAll([
+          'slotIndex', 'title', 'caption', 'paketLabel', 'imageUrl', 'updatedBy', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'slotIndex', 'title', 'caption', 'paketLabel', 'imageUrl', 'updatedBy', 'updatedAt'
+        ]) &&
+        data.slotIndex is int && data.slotIndex >= 1 && data.slotIndex <= 5 &&
+        data.title is string && data.title.size() >= 2 && data.title.size() <= 100 &&
+        data.caption is string && data.caption.size() <= 240 &&
+        data.paketLabel is string && data.paketLabel.size() <= 40 &&
+        data.imageUrl is string && data.imageUrl.size() <= 240000 &&
+        isValidId(data.updatedBy) &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAccountLookup(data) {
+      return data.keys().hasAll(['username', 'internalEmail', 'updatedAt']) &&
+        data.keys().hasOnly(['username', 'internalEmail', 'updatedAt']) &&
+        isValidUsernameId(data.username) &&
+        data.internalEmail is string && data.internalEmail.size() >= 5 && data.internalEmail.size() <= 160 &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidLoginCardCredential(data) {
+      return data.keys().hasAll(['uid', 'username', 'name', 'role', 'cardPassword', 'updatedBy', 'updatedAt']) &&
+        data.keys().hasOnly(['uid', 'username', 'name', 'role', 'classLabel', 'cardPassword', 'updatedBy', 'updatedAt']) &&
+        isValidId(data.uid) &&
+        isValidUsernameId(data.username) &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 120 &&
+        data.role in ['admin', 'kepala_pkbm', 'guru', 'murid'] &&
+        isOptionalString(data, 'classLabel', 120) &&
+        data.cardPassword is string && data.cardPassword.size() >= 6 && data.cardPassword.size() <= 64 &&
+        isValidId(data.updatedBy) &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidSchoolSettings(data) {
+      return data.keys().hasAll(['schoolName', 'npsn', 'address', 'headmasterName', 'academicYear', 'semester', 'updatedBy', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'schoolName', 'npsn', 'address', 'phone', 'email', 'website', 'slogan',
+          'headmasterName', 'headmasterNip', 'academicYear', 'semester',
+          'logoUrl', 'letterheadUrl', 'headmasterSignatureUrl', 'teacherSignatureUrl', 'stampUrl',
+          'updatedBy', 'updatedAt'
+        ]) &&
+        data.schoolName is string && data.schoolName.size() >= 2 && data.schoolName.size() <= 150 &&
+        data.npsn is string && data.npsn.size() >= 2 && data.npsn.size() <= 24 &&
+        data.address is string && data.address.size() >= 5 && data.address.size() <= 300 &&
+        data.headmasterName is string && data.headmasterName.size() >= 2 && data.headmasterName.size() <= 120 &&
+        data.academicYear is string && data.academicYear.size() >= 4 && data.academicYear.size() <= 20 &&
+        data.semester in ['Ganjil', 'Genap'] &&
+        isValidId(data.updatedBy) &&
+        data.updatedAt is timestamp &&
+        isOptionalString(data, 'phone', 40) &&
+        isOptionalString(data, 'email', 120) &&
+        isOptionalString(data, 'website', 160) &&
+        isOptionalString(data, 'slogan', 200) &&
+        isOptionalString(data, 'headmasterNip', 40) &&
+        isOptionalString(data, 'logoUrl', 350000) &&
+        isOptionalString(data, 'letterheadUrl', 350000) &&
+        isOptionalString(data, 'headmasterSignatureUrl', 350000) &&
+        isOptionalString(data, 'teacherSignatureUrl', 350000) &&
+        isOptionalString(data, 'stampUrl', 350000);
+    }
+
+    function isValidSchoolBranding(data) {
+      return data.keys().hasAll(['schoolName', 'npsn', 'address', 'academicYear', 'semester', 'updatedAt']) &&
+        data.keys().hasOnly(['schoolName', 'npsn', 'address', 'slogan', 'academicYear', 'semester', 'logoUrl', 'updatedAt']) &&
+        data.schoolName is string && data.schoolName.size() >= 2 && data.schoolName.size() <= 150 &&
+        data.npsn is string && data.npsn.size() >= 2 && data.npsn.size() <= 24 &&
+        data.address is string && data.address.size() >= 5 && data.address.size() <= 300 &&
+        data.academicYear is string && data.academicYear.size() >= 4 && data.academicYear.size() <= 20 &&
+        data.semester in ['Ganjil', 'Genap'] &&
+        data.updatedAt is timestamp &&
+        isOptionalString(data, 'slogan', 200) &&
+        isOptionalString(data, 'logoUrl', 350000);
+    }
+
+    function isValidStudent(data) {
+      return data.keys().hasAll(['nis', 'fullName', 'gender', 'paket', 'classId', 'className', 'status', 'ownerUid', 'accessUids', 'createdBy', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'nis', 'nisn', 'fullName', 'gender', 'paket', 'classId', 'className',
+          'email', 'phone', 'address', 'guardianName', 'status',
+          'ownerUid', 'accessUids', 'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        data.nis is string && data.nis.size() >= 3 && data.nis.size() <= 32 &&
+        isOptionalString(data, 'nisn', 32) &&
+        data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 120 &&
+        data.gender in ['L', 'P'] &&
+        data.paket in ['Paket A', 'Paket B', 'Paket C'] &&
+        isValidId(data.classId) &&
+        data.className is string && data.className.size() >= 1 && data.className.size() <= 80 &&
+        isOptionalString(data, 'email', 160) &&
+        isOptionalString(data, 'phone', 32) &&
+        isOptionalString(data, 'address', 250) &&
+        isOptionalString(data, 'guardianName', 120) &&
+        data.status in ['Aktif', 'Cuti', 'Lulus', 'Nonaktif'] &&
+        isValidId(data.ownerUid) &&
+        isValidUidList(data.accessUids, 30) &&
+        isValidId(data.createdBy) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidTeacher(data) {
+      return data.keys().hasAll(['nip', 'fullName', 'gender', 'specialization', 'status', 'ownerUid', 'accessUids', 'createdBy', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly([
+          'nip', 'fullName', 'gender', 'email', 'phone', 'specialization', 'education', 'status',
+          'ownerUid', 'accessUids', 'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        data.nip is string && data.nip.size() >= 3 && data.nip.size() <= 32 &&
+        data.fullName is string && data.fullName.size() >= 2 && data.fullName.size() <= 120 &&
+        data.gender in ['L', 'P'] &&
+        isOptionalString(data, 'email', 160) &&
+        isOptionalString(data, 'phone', 32) &&
+        data.specialization is string && data.specialization.size() >= 2 && data.specialization.size() <= 120 &&
+        isOptionalString(data, 'education', 60) &&
+        data.status in ['Aktif', 'Cuti', 'Nonaktif'] &&
+        isValidId(data.ownerUid) &&
+        isValidUidList(data.accessUids, 30) &&
+        isValidId(data.createdBy) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidSubject(data) {
+      return data.keys().hasAll(['code', 'name', 'paket', 'category', 'hoursPerWeek', 'kkm', 'status', 'createdBy', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['code', 'name', 'paket', 'category', 'hoursPerWeek', 'kkm', 'status', 'createdBy', 'createdAt', 'updatedAt']) &&
+        data.code is string && data.code.size() >= 2 && data.code.size() <= 24 &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 120 &&
+        data.paket in ['Paket A', 'Paket B', 'Paket C'] &&
+        data.category in ['Wajib', 'Pemberdayaan', 'Keterampilan'] &&
+        data.hoursPerWeek is number && data.hoursPerWeek >= 1 && data.hoursPerWeek <= 20 &&
+        data.kkm is number && data.kkm >= 0 && data.kkm <= 100 &&
+        data.status in ['Aktif', 'Arsip'] &&
+        isValidId(data.createdBy) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidClassroom(data) {
+      return data.keys().hasAll(['name', 'paket', 'gradeLevel', 'homeroomTeacherName', 'academicYear', 'capacity', 'studentCount', 'status', 'createdBy', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['name', 'paket', 'gradeLevel', 'homeroomTeacherId', 'homeroomTeacherName', 'academicYear', 'capacity', 'studentCount', 'status', 'createdBy', 'createdAt', 'updatedAt']) &&
+        data.name is string && data.name.size() >= 2 && data.name.size() <= 80 &&
+        data.paket in ['Paket A', 'Paket B', 'Paket C'] &&
+        data.gradeLevel is string && data.gradeLevel.size() >= 1 && data.gradeLevel.size() <= 40 &&
+        isOptionalString(data, 'homeroomTeacherId', 128) &&
+        data.homeroomTeacherName is string && data.homeroomTeacherName.size() >= 2 && data.homeroomTeacherName.size() <= 120 &&
+        data.academicYear is string && data.academicYear.size() >= 4 && data.academicYear.size() <= 20 &&
+        data.capacity is number && data.capacity >= 1 && data.capacity <= 100 &&
+        data.studentCount is number && data.studentCount >= 0 && data.studentCount <= 100 &&
+        data.status in ['Aktif', 'Arsip'] &&
+        isValidId(data.createdBy) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAssignment(data) {
+      return data.keys().hasAll([
+          'teacherId', 'teacherName', 'teacherUid', 'subjectId', 'subjectName',
+          'classId', 'className', 'paket', 'academicYear', 'semester',
+          'scheduleDay', 'scheduleTime', 'status', 'accessUids', 'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'teacherId', 'teacherName', 'teacherUid', 'subjectId', 'subjectName',
+          'classId', 'className', 'paket', 'academicYear', 'semester',
+          'scheduleDay', 'scheduleTime', 'status', 'accessUids', 'createdBy', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.teacherId) &&
+        data.teacherName is string && data.teacherName.size() >= 2 && data.teacherName.size() <= 120 &&
+        isValidId(data.teacherUid) &&
+        isValidId(data.subjectId) &&
+        data.subjectName is string && data.subjectName.size() >= 2 && data.subjectName.size() <= 120 &&
+        isValidId(data.classId) &&
+        data.className is string && data.className.size() >= 1 && data.className.size() <= 80 &&
+        data.paket in ['Paket A', 'Paket B', 'Paket C'] &&
+        data.academicYear is string && data.academicYear.size() >= 4 && data.academicYear.size() <= 20 &&
+        data.semester in ['Ganjil', 'Genap'] &&
+        data.scheduleDay is string && data.scheduleDay.size() >= 3 && data.scheduleDay.size() <= 24 &&
+        data.scheduleTime is string && data.scheduleTime.size() >= 3 && data.scheduleTime.size() <= 32 &&
+        data.status in ['Aktif', 'Selesai'] &&
+        isValidUidList(data.accessUids, 30) &&
+        isValidId(data.createdBy) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAnnouncement(data) {
+      return data.keys().hasAll(['title', 'content', 'category', 'targetRole', 'authorName', 'authorId', 'isPinned', 'publishedAt', 'createdAt', 'updatedAt']) &&
+        data.keys().hasOnly(['title', 'content', 'category', 'targetRole', 'authorName', 'authorId', 'isPinned', 'publishedAt', 'createdAt', 'updatedAt']) &&
+        data.title is string && data.title.size() >= 3 && data.title.size() <= 140 &&
+        data.content is string && data.content.size() >= 5 && data.content.size() <= 1000 &&
+        data.category in ['Akademik', 'Ujian', 'Administrasi', 'Kegiatan'] &&
+        data.targetRole in ['Semua', 'Guru', 'Murid'] &&
+        data.authorName is string && data.authorName.size() >= 2 && data.authorName.size() <= 120 &&
+        isValidId(data.authorId) &&
+        data.isPinned is bool &&
+        data.publishedAt is timestamp &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidTeachingDocument(data) {
+      return data.keys().hasAll([
+          'docType', 'title', 'paket', 'fase', 'kelas', 'mapel', 'materi',
+          'jumlahPertemuan', 'alokasiWaktu', 'academicYear', 'semester',
+          'contentHtml', 'authorName', 'ownerUid', 'accessUids', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'docType', 'title', 'paket', 'fase', 'kelas', 'mapel', 'materi',
+          'jumlahPertemuan', 'alokasiWaktu', 'academicYear', 'semester',
+          'contentHtml', 'authorName', 'ownerUid', 'accessUids', 'createdAt', 'updatedAt'
+        ]) &&
+        data.docType in ['CP', 'TP_ATP', 'KKTP', 'PROTA', 'PROSEM', 'KALDIK', 'MODUL_AJAR'] &&
+        data.title is string && data.title.size() >= 3 && data.title.size() <= 160 &&
+        data.paket in ['Paket A', 'Paket B', 'Paket C'] &&
+        data.fase is string && data.fase.size() >= 1 && data.fase.size() <= 40 &&
+        data.kelas is string && data.kelas.size() >= 1 && data.kelas.size() <= 80 &&
+        data.mapel is string && data.mapel.size() >= 2 && data.mapel.size() <= 120 &&
+        data.materi is string && data.materi.size() >= 2 && data.materi.size() <= 200 &&
+        data.jumlahPertemuan is number && data.jumlahPertemuan >= 1 && data.jumlahPertemuan <= 36 &&
+        data.alokasiWaktu is string && data.alokasiWaktu.size() >= 2 && data.alokasiWaktu.size() <= 60 &&
+        data.academicYear is string && data.academicYear.size() >= 4 && data.academicYear.size() <= 20 &&
+        data.semester in ['Ganjil', 'Genap'] &&
+        data.contentHtml is string && data.contentHtml.size() >= 10 && data.contentHtml.size() <= 350000 &&
+        data.authorName is string && data.authorName.size() >= 2 && data.authorName.size() <= 120 &&
+        isValidId(data.ownerUid) &&
+        isValidUidList(data.accessUids, 30) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidQuestionBankItem(data) {
+      return data.keys().hasAll([
+          'mapel', 'paket', 'materi', 'questionType', 'cognitiveLevel',
+          'questionJson', 'visibility', 'authorName', 'ownerUid', 'accessUids', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'mapel', 'paket', 'materi', 'questionType', 'cognitiveLevel',
+          'questionJson', 'visibility', 'authorName', 'ownerUid', 'accessUids', 'createdAt', 'updatedAt'
+        ]) &&
+        data.mapel is string && data.mapel.size() >= 2 && data.mapel.size() <= 120 &&
+        data.paket in ['Paket A', 'Paket B', 'Paket C'] &&
+        data.materi is string && data.materi.size() >= 2 && data.materi.size() <= 200 &&
+        data.questionType in ['PG', 'PG_KOMPLEKS', 'BENAR_SALAH', 'MENJODOHKAN', 'ISIAN', 'URAIAN'] &&
+        data.cognitiveLevel in ['LOTS', 'MOTS', 'HOTS'] &&
+        data.questionJson is string && data.questionJson.size() >= 10 && data.questionJson.size() <= 24000 &&
+        data.visibility in ['Sekolah', 'Pribadi'] &&
+        data.authorName is string && data.authorName.size() >= 2 && data.authorName.size() <= 120 &&
+        isValidId(data.ownerUid) &&
+        isValidUidList(data.accessUids, 30) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidExamPackage(data) {
+      return data.keys().hasAll([
+          'title', 'examType', 'paket', 'kelas', 'mapel', 'materi',
+          'academicYear', 'semester', 'durationMinutes', 'hasPaketB',
+          'isOnlinePublished', 'payloadJson', 'authorName', 'ownerUid', 'accessUids', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'title', 'examType', 'paket', 'kelas', 'mapel', 'materi',
+          'academicYear', 'semester', 'durationMinutes', 'hasPaketB',
+          'isOnlinePublished', 'payloadJson', 'authorName', 'ownerUid', 'accessUids', 'createdAt', 'updatedAt'
+        ]) &&
+        data.title is string && data.title.size() >= 3 && data.title.size() <= 160 &&
+        data.examType in ['ASTS', 'ASAT', 'PAS', 'UH'] &&
+        data.paket in ['Paket A', 'Paket B', 'Paket C'] &&
+        data.kelas is string && data.kelas.size() >= 1 && data.kelas.size() <= 80 &&
+        data.mapel is string && data.mapel.size() >= 2 && data.mapel.size() <= 120 &&
+        data.materi is string && data.materi.size() >= 2 && data.materi.size() <= 200 &&
+        data.academicYear is string && data.academicYear.size() >= 4 && data.academicYear.size() <= 20 &&
+        data.semester in ['Ganjil', 'Genap'] &&
+        data.durationMinutes is number && data.durationMinutes >= 5 && data.durationMinutes <= 300 &&
+        data.hasPaketB is bool &&
+        data.isOnlinePublished is bool &&
+        data.payloadJson is string && data.payloadJson.size() >= 20 && data.payloadJson.size() <= 450000 &&
+        data.authorName is string && data.authorName.size() >= 2 && data.authorName.size() <= 120 &&
+        isValidId(data.ownerUid) &&
+        isValidUidList(data.accessUids, 30) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidExamSubmission(data) {
+      return data.keys().hasAll([
+          'examId', 'examTitle', 'paketVariant', 'studentUid', 'studentName', 'studentNis',
+          'paket', 'className', 'answersJson', 'essayGradesJson', 'autoScore', 'essayScore',
+          'maxScore', 'finalScore', 'status', 'accessUids', 'submittedAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'examId', 'examTitle', 'paketVariant', 'studentUid', 'studentName', 'studentNis',
+          'paket', 'className', 'answersJson', 'essayGradesJson', 'autoScore', 'essayScore',
+          'maxScore', 'finalScore', 'status', 'accessUids', 'submittedAt', 'updatedAt'
+        ]) &&
+        isValidId(data.examId) &&
+        data.examTitle is string && data.examTitle.size() >= 2 && data.examTitle.size() <= 160 &&
+        data.paketVariant in ['A', 'B', 'C'] &&
+        isValidId(data.studentUid) &&
+        data.studentName is string && data.studentName.size() >= 2 && data.studentName.size() <= 120 &&
+        data.studentNis is string && data.studentNis.size() >= 1 && data.studentNis.size() <= 32 &&
+        data.paket in ['Paket A', 'Paket B', 'Paket C'] &&
+        data.className is string && data.className.size() >= 1 && data.className.size() <= 80 &&
+        data.answersJson is string && data.answersJson.size() >= 2 && data.answersJson.size() <= 200000 &&
+        data.essayGradesJson is string && data.essayGradesJson.size() >= 2 && data.essayGradesJson.size() <= 100000 &&
+        data.autoScore is number && data.autoScore >= 0 && data.autoScore <= 1000 &&
+        data.essayScore is number && data.essayScore >= 0 && data.essayScore <= 1000 &&
+        data.maxScore is number && data.maxScore >= 1 && data.maxScore <= 1000 &&
+        data.finalScore is number && data.finalScore >= 0 && data.finalScore <= 100 &&
+        data.status in ['Menunggu Nilai Uraian', 'Selesai Dinilai'] &&
+        isValidUidList(data.accessUids, 30) &&
+        data.submittedAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidAttendanceSession(data) {
+      return data.keys().hasAll([
+          'date', 'monthKey', 'academicYear', 'semester', 'paket',
+          'classId', 'className', 'subjectId', 'subjectName',
+          'teacherId', 'teacherName', 'recordsJson',
+          'summaryHadir', 'summaryIzin', 'summarySakit', 'summaryAlpa',
+          'studentUids', 'ownerUid', 'accessUids', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'date', 'monthKey', 'academicYear', 'semester', 'paket',
+          'classId', 'className', 'subjectId', 'subjectName',
+          'teacherId', 'teacherName', 'recordsJson',
+          'summaryHadir', 'summaryIzin', 'summarySakit', 'summaryAlpa',
+          'studentUids', 'ownerUid', 'accessUids', 'createdAt', 'updatedAt'
+        ]) &&
+        data.date is string && data.date.size() == 10 && data.date.matches('^[0-9]{4}-[0-9]{2}-[0-9]{2}$') &&
+        data.monthKey is string && data.monthKey.size() == 7 &&
+        data.academicYear is string && data.academicYear.size() >= 4 && data.academicYear.size() <= 20 &&
+        data.semester in ['Ganjil', 'Genap'] &&
+        data.paket in ['Paket A', 'Paket B', 'Paket C'] &&
+        isValidId(data.classId) &&
+        data.className is string && data.className.size() >= 1 && data.className.size() <= 80 &&
+        isValidId(data.subjectId) &&
+        data.subjectName is string && data.subjectName.size() >= 2 && data.subjectName.size() <= 120 &&
+        data.teacherId is string && data.teacherId.size() >= 1 && data.teacherId.size() <= 128 &&
+        data.teacherName is string && data.teacherName.size() >= 2 && data.teacherName.size() <= 120 &&
+        data.recordsJson is string && data.recordsJson.size() >= 2 && data.recordsJson.size() <= 150000 &&
+        data.summaryHadir is number && data.summaryHadir >= 0 && data.summaryHadir <= 200 &&
+        data.summaryIzin is number && data.summaryIzin >= 0 && data.summaryIzin <= 200 &&
+        data.summarySakit is number && data.summarySakit >= 0 && data.summarySakit <= 200 &&
+        data.summaryAlpa is number && data.summaryAlpa >= 0 && data.summaryAlpa <= 200 &&
+        isValidUidList(data.studentUids, 100) &&
+        isValidId(data.ownerUid) &&
+        isValidUidList(data.accessUids, 50) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidTeacherTask(data) {
+      return data.keys().hasAll([
+          'title', 'description', 'paket', 'classId', 'className',
+          'subjectId', 'subjectName', 'teacherId', 'teacherName', 'teacherUid',
+          'dueAt', 'maxScore', 'attachmentsJson', 'targetStudentUids',
+          'ownerUid', 'accessUids', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'title', 'description', 'paket', 'classId', 'className',
+          'deliveryMode', 'onlineClassId', 'onlineClassTitle',
+          'subjectId', 'subjectName', 'teacherId', 'teacherName', 'teacherUid',
+          'dueAt', 'maxScore', 'attachmentsJson', 'targetStudentUids',
+          'ownerUid', 'accessUids', 'createdAt', 'updatedAt'
+        ]) &&
+        data.title is string && data.title.size() >= 3 && data.title.size() <= 160 &&
+        data.description is string && data.description.size() >= 5 && data.description.size() <= 8000 &&
+        data.paket in ['Paket A', 'Paket B', 'Paket C'] &&
+        isValidId(data.classId) &&
+        data.className is string && data.className.size() >= 1 && data.className.size() <= 80 &&
+        (!('deliveryMode' in data) || data.deliveryMode in ['regular', 'online']) &&
+        (!('onlineClassId' in data) || (data.onlineClassId is string && (data.onlineClassId == '' || isValidId(data.onlineClassId)))) &&
+        (!('onlineClassTitle' in data) || (data.onlineClassTitle is string && data.onlineClassTitle.size() <= 180)) &&
+        isValidId(data.subjectId) &&
+        data.subjectName is string && data.subjectName.size() >= 2 && data.subjectName.size() <= 120 &&
+        data.teacherId is string && data.teacherId.size() >= 1 && data.teacherId.size() <= 128 &&
+        data.teacherName is string && data.teacherName.size() >= 2 && data.teacherName.size() <= 120 &&
+        isValidId(data.teacherUid) &&
+        data.dueAt is string && data.dueAt.size() >= 10 && data.dueAt.size() <= 40 &&
+        data.maxScore is number && data.maxScore >= 1 && data.maxScore <= 1000 &&
+        data.attachmentsJson is string && data.attachmentsJson.size() >= 2 && data.attachmentsJson.size() <= 750000 &&
+        isValidUidList(data.targetStudentUids, 100) &&
+        isValidId(data.ownerUid) &&
+        isValidUidList(data.accessUids, 50) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidTaskSubmission(data) {
+      return data.keys().hasAll([
+          'taskId', 'taskTitle', 'classId', 'className', 'subjectId', 'subjectName',
+          'studentId', 'studentUid', 'studentName', 'studentNis', 'answerText',
+          'attachmentsJson', 'status', 'isLate', 'score', 'feedback',
+          'gradedBy', 'gradedAt', 'accessUids', 'submittedAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'taskId', 'taskTitle', 'classId', 'className', 'subjectId', 'subjectName',
+          'studentId', 'studentUid', 'studentName', 'studentNis', 'answerText',
+          'attachmentsJson', 'status', 'isLate', 'score', 'feedback',
+          'gradedBy', 'gradedAt', 'accessUids', 'submittedAt', 'updatedAt'
+        ]) &&
+        isValidId(data.taskId) &&
+        data.taskTitle is string && data.taskTitle.size() >= 2 && data.taskTitle.size() <= 160 &&
+        isValidId(data.classId) &&
+        data.className is string && data.className.size() >= 1 && data.className.size() <= 80 &&
+        isValidId(data.subjectId) &&
+        data.subjectName is string && data.subjectName.size() >= 2 && data.subjectName.size() <= 120 &&
+        isValidId(data.studentId) &&
+        isValidId(data.studentUid) &&
+        data.studentName is string && data.studentName.size() >= 2 && data.studentName.size() <= 120 &&
+        data.studentNis is string && data.studentNis.size() >= 1 && data.studentNis.size() <= 32 &&
+        data.answerText is string && data.answerText.size() <= 15000 &&
+        data.attachmentsJson is string && data.attachmentsJson.size() >= 2 && data.attachmentsJson.size() <= 750000 &&
+        data.status in ['Terkumpul', 'Terlambat', 'Revisi', 'Sudah Dinilai'] &&
+        data.isLate is bool &&
+        data.score is number && data.score >= 0 && data.score <= 1000 &&
+        data.feedback is string && data.feedback.size() <= 4000 &&
+        data.gradedBy is string && data.gradedBy.size() <= 120 &&
+        data.gradedAt is string && data.gradedAt.size() <= 40 &&
+        isValidUidList(data.accessUids, 50) &&
+        data.submittedAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidGradeWeightConfig(data) {
+      return data.keys().hasAll([
+          'classId', 'subjectId', 'tugas', 'uh', 'asts', 'asat', 'praktik', 'sikap',
+          'ownerUid', 'accessUids', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'classId', 'subjectId', 'tugas', 'uh', 'asts', 'asat', 'praktik', 'sikap',
+          'ownerUid', 'accessUids', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.classId) &&
+        isValidId(data.subjectId) &&
+        data.tugas is number && data.tugas >= 0 && data.tugas <= 100 &&
+        data.uh is number && data.uh >= 0 && data.uh <= 100 &&
+        data.asts is number && data.asts >= 0 && data.asts <= 100 &&
+        data.asat is number && data.asat >= 0 && data.asat <= 100 &&
+        data.praktik is number && data.praktik >= 0 && data.praktik <= 100 &&
+        data.sikap is number && data.sikap >= 0 && data.sikap <= 100 &&
+        (data.tugas + data.uh + data.asts + data.asat + data.praktik + data.sikap) == 100 &&
+        isValidId(data.ownerUid) &&
+        isValidUidList(data.accessUids, 50) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidGradeRecord(data) {
+      return data.keys().hasAll([
+          'studentId', 'studentUid', 'studentName', 'studentNis',
+          'classId', 'className', 'paket', 'subjectId', 'subjectName', 'kkm',
+          'teacherId', 'teacherName', 'academicYear', 'semester',
+          'tugas', 'uh', 'asts', 'asat', 'praktik', 'sikap',
+          'finalScore', 'predicate', 'isPassed', 'achievementDescription', 'homeroomNote',
+          'ownerUid', 'accessUids', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'studentId', 'studentUid', 'studentName', 'studentNis',
+          'classId', 'className', 'paket', 'subjectId', 'subjectName', 'kkm',
+          'teacherId', 'teacherName', 'academicYear', 'semester',
+          'tugas', 'uh', 'asts', 'asat', 'praktik', 'sikap',
+          'finalScore', 'predicate', 'isPassed', 'achievementDescription', 'homeroomNote',
+          'ownerUid', 'accessUids', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.studentId) &&
+        isValidId(data.studentUid) &&
+        data.studentName is string && data.studentName.size() >= 2 && data.studentName.size() <= 120 &&
+        data.studentNis is string && data.studentNis.size() >= 1 && data.studentNis.size() <= 32 &&
+        isValidId(data.classId) &&
+        data.className is string && data.className.size() >= 1 && data.className.size() <= 80 &&
+        data.paket in ['Paket A', 'Paket B', 'Paket C'] &&
+        isValidId(data.subjectId) &&
+        data.subjectName is string && data.subjectName.size() >= 2 && data.subjectName.size() <= 120 &&
+        data.kkm is number && data.kkm >= 0 && data.kkm <= 100 &&
+        data.teacherId is string && data.teacherId.size() >= 1 && data.teacherId.size() <= 128 &&
+        data.teacherName is string && data.teacherName.size() >= 2 && data.teacherName.size() <= 120 &&
+        data.academicYear is string && data.academicYear.size() >= 4 && data.academicYear.size() <= 20 &&
+        data.semester in ['Ganjil', 'Genap'] &&
+        data.tugas is number && data.tugas >= 0 && data.tugas <= 100 &&
+        data.uh is number && data.uh >= 0 && data.uh <= 100 &&
+        data.asts is number && data.asts >= 0 && data.asts <= 100 &&
+        data.asat is number && data.asat >= 0 && data.asat <= 100 &&
+        data.praktik is number && data.praktik >= 0 && data.praktik <= 100 &&
+        data.sikap is number && data.sikap >= 0 && data.sikap <= 100 &&
+        data.finalScore is number && data.finalScore >= 0 && data.finalScore <= 100 &&
+        data.predicate in ['A', 'B', 'C', 'D'] &&
+        data.isPassed is bool &&
+        data.achievementDescription is string && data.achievementDescription.size() <= 2000 &&
+        data.homeroomNote is string && data.homeroomNote.size() <= 1000 &&
+        isValidId(data.ownerUid) &&
+        isValidUidList(data.accessUids, 50) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidOnlineClassSession(data) {
+      return data.keys().hasAll([
+          'title', 'paket', 'fase', 'classId', 'className', 'subjectId', 'subjectName',
+          'teacherId', 'teacherName', 'teacherUid', 'modality', 'platform',
+          'meetingUrl', 'meetingCode', 'recordingUrl',
+          'scheduleDate', 'startTime', 'endTime', 'durationMinutes', 'status',
+          'description', 'learningObjectives', 'materials', 'isPublished',
+          'ownerUid', 'accessUids', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'title', 'paket', 'fase', 'classId', 'className', 'subjectId', 'subjectName',
+          'teacherId', 'teacherName', 'teacherUid', 'modality', 'platform',
+          'meetingUrl', 'meetingCode', 'recordingUrl',
+          'scheduleDate', 'startTime', 'endTime', 'durationMinutes', 'status',
+          'description', 'learningObjectives', 'materials', 'isPublished',
+          'ownerUid', 'accessUids', 'createdAt', 'updatedAt'
+        ]) &&
+        data.title is string && data.title.size() >= 3 && data.title.size() <= 180 &&
+        data.paket in ['Paket A', 'Paket B', 'Paket C'] &&
+        data.fase is string && data.fase.size() >= 1 && data.fase.size() <= 40 &&
+        isValidId(data.classId) &&
+        data.className is string && data.className.size() >= 1 && data.className.size() <= 80 &&
+        isValidId(data.subjectId) &&
+        data.subjectName is string && data.subjectName.size() >= 2 && data.subjectName.size() <= 120 &&
+        data.teacherId is string && data.teacherId.size() >= 1 && data.teacherId.size() <= 128 &&
+        data.teacherName is string && data.teacherName.size() >= 2 && data.teacherName.size() <= 120 &&
+        isValidId(data.teacherUid) &&
+        data.modality in ['Live Interaktif', 'Tutorial Daring', 'Belajar Mandiri'] &&
+        data.platform in ['Google Meet', 'Zoom Meeting', 'YouTube Live', 'Ruang Belajar Mandiri'] &&
+        data.meetingUrl is string && data.meetingUrl.size() <= 500 &&
+        data.meetingCode is string && data.meetingCode.size() <= 60 &&
+        data.recordingUrl is string && data.recordingUrl.size() <= 500 &&
+        data.scheduleDate is string && data.scheduleDate.size() >= 8 && data.scheduleDate.size() <= 20 &&
+        data.startTime is string && data.startTime.size() >= 4 && data.startTime.size() <= 10 &&
+        data.endTime is string && data.endTime.size() >= 4 && data.endTime.size() <= 10 &&
+        data.durationMinutes is number && data.durationMinutes >= 15 && data.durationMinutes <= 360 &&
+        data.status in ['Terjadwal', 'Live', 'Selesai'] &&
+        data.description is string && data.description.size() <= 3000 &&
+        data.learningObjectives is list && data.learningObjectives.size() <= 10 &&
+        (data.learningObjectives.size() == 0 || data.learningObjectives[0] is string) &&
+        data.materials is list && data.materials.size() <= 15 &&
+        (data.materials.size() == 0 || data.materials[0] is map) &&
+        data.isPublished is bool &&
+        isValidId(data.ownerUid) &&
+        isValidUidList(data.accessUids, 50) &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidOnlineClassProgress(data) {
+      return data.keys().hasAll([
+          'sessionId', 'paket', 'classId', 'studentId', 'studentUid',
+          'studentName', 'studentNis', 'joinedLive', 'joinedAt',
+          'completedMaterialIds', 'progressPercent', 'personalNote', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'sessionId', 'paket', 'classId', 'studentId', 'studentUid',
+          'studentName', 'studentNis', 'joinedLive', 'joinedAt',
+          'completedMaterialIds', 'progressPercent', 'personalNote', 'updatedAt'
+        ]) &&
+        isValidId(data.sessionId) &&
+        data.paket in ['Paket A', 'Paket B', 'Paket C'] &&
+        isValidId(data.classId) &&
+        data.studentId is string && data.studentId.size() >= 1 && data.studentId.size() <= 128 &&
+        isValidId(data.studentUid) &&
+        data.studentName is string && data.studentName.size() >= 2 && data.studentName.size() <= 120 &&
+        data.studentNis is string && data.studentNis.size() <= 32 &&
+        data.joinedLive is bool &&
+        data.joinedAt is string && data.joinedAt.size() <= 40 &&
+        data.completedMaterialIds is list && data.completedMaterialIds.size() <= 20 &&
+        (data.completedMaterialIds.size() == 0 || data.completedMaterialIds[0] is string) &&
+        data.progressPercent is number && data.progressPercent >= 0 && data.progressPercent <= 100 &&
+        data.personalNote is string && data.personalNote.size() <= 3000 &&
+        data.updatedAt is timestamp;
+    }
+
+    function isValidOnlineClassComment(data) {
+      return data.keys().hasAll([
+          'sessionId', 'paket', 'authorUid', 'authorName', 'authorRole',
+          'message', 'isPinned', 'createdAt', 'updatedAt'
+        ]) &&
+        data.keys().hasOnly([
+          'sessionId', 'paket', 'authorUid', 'authorName', 'authorRole',
+          'message', 'isPinned', 'createdAt', 'updatedAt'
+        ]) &&
+        isValidId(data.sessionId) &&
+        data.paket in ['Paket A', 'Paket B', 'Paket C'] &&
+        isValidId(data.authorUid) &&
+        data.authorName is string && data.authorName.size() >= 2 && data.authorName.size() <= 120 &&
+        data.authorRole in ['admin', 'kepala_pkbm', 'guru', 'murid'] &&
+        data.message is string && data.message.size() >= 1 && data.message.size() <= 2000 &&
+        data.isPinned is bool &&
+        data.createdAt is timestamp &&
+        data.updatedAt is timestamp;
+    }
+
+    // 4. System Setup Lock & Minimal Public Username Lookup
+    match /system_config/{configId} {
+      allow get: if configId == 'auth_setup';
+      allow list: if false;
+
+      allow create: if isSignedIn() &&
+        configId == 'auth_setup' &&
+        !exists(/databases/$(database)/documents/system_config/auth_setup) &&
+        incoming().keys().hasAll(['adminInitialized', 'initializedAt']) &&
+        incoming().keys().hasOnly(['adminInitialized', 'initializedAt']) &&
+        incoming().adminInitialized == true &&
+        incoming().initializedAt == request.time;
+
+      allow update, delete: if false;
+    }
+
+    match /account_lookups/{username} {
+      // Hanya membaca satu dokumen persis sesuai username saat login (tanpa list publik & tanpa PII)
+      allow get: if isValidUsernameId(username);
+      allow list: if isAdmin();
+
+      allow create: if isValidUsernameId(username) &&
+        isValidAccountLookup(incoming()) &&
+        incoming().username == username &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (isSignedIn() && !exists(/databases/$(database)/documents/system_config/auth_setup))
+        );
+
+      allow update: if isAdmin() &&
+        isValidUsernameId(username) &&
+        isValidAccountLookup(incoming()) &&
+        incoming().username == username &&
+        incoming().updatedAt == request.time;
+
+      allow delete: if isAdmin() && isValidUsernameId(username);
+    }
+
+    match /login_card_credentials/{cardId} {
+      // Khusus Admin aktif untuk mencetak Kartu Login lintas perangkat,
+      // serta pengguna aktif itu sendiri untuk menyinkronkan sandi kartu miliknya saat berhasil login.
+      allow get: if isValidId(cardId) && (
+        isAdmin() ||
+        (isActiveAccount() && request.auth.uid == cardId)
+      );
+      allow list: if isAdmin();
+
+      allow create: if isValidId(cardId) &&
+        isValidLoginCardCredential(incoming()) &&
+        incoming().uid == cardId &&
+        incoming().updatedBy == request.auth.uid &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            isActiveAccount() &&
+            request.auth.uid == cardId &&
+            incoming().role == getUserRole() &&
+            incoming().username == get(/databases/$(database)/documents/users/$(request.auth.uid)).data.username
+          )
+        );
+
+      allow update: if isValidId(cardId) &&
+        isValidLoginCardCredential(incoming()) &&
+        incoming().uid == cardId &&
+        incoming().uid == existing().uid &&
+        incoming().updatedBy == request.auth.uid &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'username', 'name', 'role', 'classLabel', 'cardPassword', 'updatedBy', 'updatedAt'
+        ]) && (
+          isAdmin() ||
+          (
+            isActiveAccount() &&
+            request.auth.uid == cardId &&
+            incoming().role == existing().role &&
+            incoming().username == existing().username
+          )
+        );
+
+      allow delete: if isAdmin() && isValidId(cardId);
+    }
+
+    // 5. Collection Rules
+    match /users/{userId} {
+      allow get: if isSignedIn() && isValidId(userId) && (request.auth.uid == userId || isAdmin());
+      allow list: if isAdmin();
+
+      // Hanya Admin aktif yang dapat membuat akun, KECUALI setup Admin pertama saat system_config/auth_setup belum ada
+      allow create: if isSignedIn() &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming()) &&
+        incoming().uid == userId &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            request.auth.uid == userId &&
+            incoming().role == 'admin' &&
+            incoming().status == 'Aktif' &&
+            !exists(/databases/$(database)/documents/system_config/auth_setup)
+          )
+        );
+
+      allow update: if isSignedIn() &&
+        isValidId(userId) &&
+        isValidUserProfile(incoming()) &&
+        incoming().uid == existing().uid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            isActiveAccount() &&
+            request.auth.uid == userId &&
+            incoming().role == existing().role &&
+            incoming().status == existing().status &&
+            incoming().username == existing().username &&
+            incoming().internalEmail == existing().internalEmail && (
+              incoming().diff(existing()).affectedKeys().hasOnly(['lastLoginAt', 'updatedAt']) ||
+              (
+                existing().role in ['admin', 'kepala_pkbm', 'guru'] &&
+                incoming().diff(existing()).affectedKeys().hasOnly(['avatarUrl', 'updatedAt'])
+              )
+            )
+          )
+        );
+
+      allow delete: if isAdmin() && isValidId(userId) && userId != request.auth.uid;
+    }
+
+    match /school_settings/{settingId} {
+      // Semua akun aktif (Admin, Kepala PKBM, Guru, Murid) membaca pengaturan resmi lembaga 'main'
+      // agar kop surat, logo, nama & NIP Kepala PKBM, serta TTD selalu sinkron mengikuti Admin Master.
+      allow get: if isActiveAccount() && isValidId(settingId) && (settingId == 'main' || isAdmin());
+      allow list: if isAdmin();
+
+      allow create: if isAdmin() &&
+        isValidId(settingId) &&
+        isValidSchoolSettings(incoming()) &&
+        incoming().updatedBy == request.auth.uid &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isAdmin() &&
+        isValidId(settingId) &&
+        isValidSchoolSettings(incoming()) &&
+        incoming().updatedBy == request.auth.uid &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'schoolName', 'npsn', 'address', 'phone', 'email', 'website', 'slogan',
+          'headmasterName', 'headmasterNip', 'academicYear', 'semester',
+          'logoUrl', 'letterheadUrl', 'headmasterSignatureUrl', 'teacherSignatureUrl', 'stampUrl',
+          'updatedBy', 'updatedAt'
+        ]);
+
+      allow delete: if isAdmin() && isValidId(settingId);
+    }
+
+    match /school_branding/{brandingId} {
+      // Hanya dokumen tunggal 'main' tanpa PII untuk logo di halaman login dan sesi semua role
+      allow get: if brandingId == 'main';
+      allow list: if isAdmin();
+
+      allow create: if isAdmin() &&
+        brandingId == 'main' &&
+        isValidSchoolBranding(incoming()) &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isAdmin() &&
+        brandingId == 'main' &&
+        isValidSchoolBranding(incoming()) &&
+        incoming().updatedAt == request.time;
+
+      allow delete: if isAdmin() && brandingId == 'main';
+    }
+
+    match /gallery_photos/{photoId} {
+      // 5 slot foto kegiatan belajar mengajar publik tanpa PII untuk laman depan (Login & Dasbor)
+      allow get: if photoId in ['slot_1', 'slot_2', 'slot_3', 'slot_4', 'slot_5'];
+      allow list: if isActiveAccount() &&
+        resource.data.slotIndex >= 1 &&
+        resource.data.slotIndex <= 5;
+
+      allow create, update: if (isStaff() || isTeacher()) &&
+        photoId in ['slot_1', 'slot_2', 'slot_3', 'slot_4', 'slot_5'] &&
+        isValidGalleryPhoto(incoming()) &&
+        incoming().updatedBy == request.auth.uid &&
+        incoming().updatedAt == request.time;
+
+      allow delete: if (isStaff() || isTeacher()) &&
+        photoId in ['slot_1', 'slot_2', 'slot_3', 'slot_4', 'slot_5'];
+    }
+
+    match /students/{studentId} {
+      allow get: if isActiveAccount() && isValidId(studentId) && (
+        existing().ownerUid == request.auth.uid ||
+        request.auth.uid in existing().accessUids ||
+        isStaff() ||
+        isTeacher()
+      );
+      allow list: if isActiveAccount() && (
+        resource.data.ownerUid == request.auth.uid ||
+        request.auth.uid in resource.data.accessUids ||
+        isStaff() ||
+        isTeacher()
+      );
+
+      allow create: if isAdmin() &&
+        isValidId(studentId) &&
+        isValidStudent(incoming()) &&
+        exists(/databases/$(database)/documents/classes/$(incoming().classId)) &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isActiveAccount() &&
+        isValidId(studentId) &&
+        isValidStudent(incoming()) &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            existing().ownerUid == request.auth.uid &&
+            existing().status != 'Nonaktif' &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['phone', 'address', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isAdmin() && isValidId(studentId);
+    }
+
+    match /teachers/{teacherId} {
+      allow get: if isActiveAccount() && isValidId(teacherId) && (
+        existing().ownerUid == request.auth.uid ||
+        request.auth.uid in existing().accessUids ||
+        isStaff()
+      );
+      allow list: if isActiveAccount() && (
+        resource.data.ownerUid == request.auth.uid ||
+        request.auth.uid in resource.data.accessUids ||
+        isStaff()
+      );
+
+      allow create: if isAdmin() &&
+        isValidId(teacherId) &&
+        isValidTeacher(incoming()) &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isActiveAccount() &&
+        isValidId(teacherId) &&
+        isValidTeacher(incoming()) &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            existing().ownerUid == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['phone', 'education', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isAdmin() && isValidId(teacherId);
+    }
+
+    match /subjects/{subjectId} {
+      allow get: if isActiveAccount() && isValidId(subjectId);
+      allow list: if isActiveAccount() && resource.data.status in ['Aktif', 'Arsip'];
+
+      allow create: if isAdmin() &&
+        isValidId(subjectId) &&
+        isValidSubject(incoming()) &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isAdmin() &&
+        isValidId(subjectId) &&
+        isValidSubject(incoming()) &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'code', 'name', 'paket', 'category', 'hoursPerWeek', 'kkm', 'status', 'updatedAt'
+        ]);
+
+      allow delete: if isAdmin() && isValidId(subjectId);
+    }
+
+    match /classes/{classId} {
+      allow get: if isActiveAccount() && isValidId(classId);
+      allow list: if isActiveAccount() && resource.data.status in ['Aktif', 'Arsip'];
+
+      allow create: if isAdmin() &&
+        isValidId(classId) &&
+        isValidClassroom(incoming()) &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isAdmin() &&
+        isValidId(classId) &&
+        isValidClassroom(incoming()) &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'name', 'paket', 'gradeLevel', 'homeroomTeacherId', 'homeroomTeacherName',
+          'academicYear', 'capacity', 'studentCount', 'status', 'updatedAt'
+        ]);
+
+      allow delete: if isAdmin() && isValidId(classId);
+    }
+
+    match /assignments/{assignmentId} {
+      allow get: if isActiveAccount() && isValidId(assignmentId);
+      allow list: if isActiveAccount() && resource.data.status in ['Aktif', 'Selesai'];
+
+      allow create: if isAdmin() &&
+        isValidId(assignmentId) &&
+        isValidAssignment(incoming()) &&
+        exists(/databases/$(database)/documents/teachers/$(incoming().teacherId)) &&
+        exists(/databases/$(database)/documents/subjects/$(incoming().subjectId)) &&
+        exists(/databases/$(database)/documents/classes/$(incoming().classId)) &&
+        incoming().createdBy == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time;
+
+      allow update: if isActiveAccount() &&
+        isValidId(assignmentId) &&
+        isValidAssignment(incoming()) &&
+        incoming().createdBy == existing().createdBy &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            existing().teacherUid == request.auth.uid &&
+            existing().status != 'Selesai' &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['scheduleDay', 'scheduleTime', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isAdmin() && isValidId(assignmentId);
+    }
+
+    match /announcements/{announcementId} {
+      allow get: if isActiveAccount() && isValidId(announcementId);
+      allow list: if isActiveAccount() && resource.data.targetRole in ['Semua', 'Guru', 'Murid'];
+
+      allow create: if isActiveAccount() &&
+        isValidId(announcementId) &&
+        isValidAnnouncement(incoming()) &&
+        incoming().authorId == request.auth.uid &&
+        incoming().publishedAt == request.time &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time && (
+          isStaff() ||
+          (
+            isTeacher() &&
+            incoming().category == 'Akademik' &&
+            incoming().targetRole == 'Murid' &&
+            incoming().isPinned == false
+          )
+        );
+
+      allow update: if isStaff() &&
+        isValidId(announcementId) &&
+        isValidAnnouncement(incoming()) &&
+        incoming().authorId == existing().authorId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time &&
+        incoming().diff(existing()).affectedKeys().hasOnly([
+          'title', 'content', 'category', 'targetRole', 'isPinned', 'updatedAt'
+        ]);
+
+      allow delete: if isStaff() && isValidId(announcementId);
+    }
+
+    match /teaching_documents/{docId} {
+      allow get: if isActiveAccount() && isValidId(docId) && (
+        existing().ownerUid == request.auth.uid ||
+        request.auth.uid in existing().accessUids ||
+        isStaff()
+      );
+      allow list: if isActiveAccount() && (
+        resource.data.ownerUid == request.auth.uid ||
+        request.auth.uid in resource.data.accessUids ||
+        isStaff()
+      );
+
+      allow create: if isActiveAccount() &&
+        isValidId(docId) &&
+        isValidTeachingDocument(incoming()) &&
+        incoming().ownerUid == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time && (
+          isStaff() || isTeacher()
+        );
+
+      allow update: if isActiveAccount() &&
+        isValidId(docId) &&
+        isValidTeachingDocument(incoming()) &&
+        incoming().ownerUid == existing().ownerUid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            existing().ownerUid == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'materi', 'jumlahPertemuan', 'alokasiWaktu', 'contentHtml', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isActiveAccount() && isValidId(docId) && (
+        isAdmin() || existing().ownerUid == request.auth.uid
+      );
+    }
+
+    match /question_bank/{questionId} {
+      allow get: if isActiveAccount() && isValidId(questionId) && (
+        existing().ownerUid == request.auth.uid ||
+        request.auth.uid in existing().accessUids ||
+        existing().visibility == 'Sekolah' ||
+        isStaff()
+      );
+      allow list: if isActiveAccount() && (
+        resource.data.ownerUid == request.auth.uid ||
+        request.auth.uid in resource.data.accessUids ||
+        (resource.data.visibility == 'Sekolah' && (isStaff() || isTeacher())) ||
+        isStaff()
+      );
+
+      allow create: if isActiveAccount() &&
+        isValidId(questionId) &&
+        isValidQuestionBankItem(incoming()) &&
+        incoming().ownerUid == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time && (
+          isStaff() || isTeacher()
+        );
+
+      allow update: if isActiveAccount() &&
+        isValidId(questionId) &&
+        isValidQuestionBankItem(incoming()) &&
+        incoming().ownerUid == existing().ownerUid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            existing().ownerUid == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'mapel', 'paket', 'materi', 'questionType', 'cognitiveLevel',
+              'questionJson', 'visibility', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isActiveAccount() && isValidId(questionId) && (
+        isAdmin() || existing().ownerUid == request.auth.uid
+      );
+    }
+
+    match /exams/{examId} {
+      allow get: if isActiveAccount() && isValidId(examId) && (
+        existing().isOnlinePublished == true ||
+        existing().ownerUid == request.auth.uid ||
+        request.auth.uid in existing().accessUids ||
+        isStaff()
+      );
+      allow list: if isActiveAccount() && (
+        resource.data.isOnlinePublished == true ||
+        resource.data.ownerUid == request.auth.uid ||
+        request.auth.uid in resource.data.accessUids ||
+        isStaff()
+      );
+
+      allow create: if isActiveAccount() &&
+        isValidId(examId) &&
+        isValidExamPackage(incoming()) &&
+        incoming().ownerUid == request.auth.uid &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time && (
+          isStaff() || isTeacher()
+        );
+
+      allow update: if isActiveAccount() &&
+        isValidId(examId) &&
+        isValidExamPackage(incoming()) &&
+        incoming().ownerUid == existing().ownerUid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            existing().ownerUid == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'examType', 'paket', 'kelas', 'mapel', 'materi',
+              'durationMinutes', 'hasPaketB', 'isOnlinePublished', 'payloadJson', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isActiveAccount() && isValidId(examId) && (
+        isAdmin() || existing().ownerUid == request.auth.uid
+      );
+    }
+
+    match /exam_submissions/{submissionId} {
+      allow get: if isActiveAccount() && isValidId(submissionId) && (
+        existing().studentUid == request.auth.uid ||
+        request.auth.uid in existing().accessUids ||
+        isStaff()
+      );
+      allow list: if isActiveAccount() && (
+        resource.data.studentUid == request.auth.uid ||
+        request.auth.uid in resource.data.accessUids ||
+        isStaff()
+      );
+
+      allow create: if isActiveAccount() &&
+        isValidId(submissionId) &&
+        isValidExamSubmission(incoming()) &&
+        exists(/databases/$(database)/documents/exams/$(incoming().examId)) &&
+        incoming().submittedAt == request.time &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          incoming().studentUid == request.auth.uid
+        );
+
+      allow update: if isActiveAccount() &&
+        isValidId(submissionId) &&
+        isValidExamSubmission(incoming()) &&
+        incoming().examId == existing().examId &&
+        incoming().submittedAt == existing().submittedAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            incoming().studentUid == existing().studentUid &&
+            (isKepala() || (isTeacher() && request.auth.uid in existing().accessUids)) &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'essayGradesJson', 'essayScore', 'finalScore', 'status', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isAdmin() && isValidId(submissionId);
+    }
+
+    match /attendance_sessions/{sessionId} {
+      allow get: if isActiveAccount() && isValidId(sessionId) && (
+        existing().ownerUid == request.auth.uid ||
+        request.auth.uid in existing().accessUids ||
+        request.auth.uid in existing().studentUids ||
+        isStaff()
+      );
+      allow list: if isActiveAccount() && (
+        resource.data.ownerUid == request.auth.uid ||
+        request.auth.uid in resource.data.accessUids ||
+        request.auth.uid in resource.data.studentUids ||
+        isStaff()
+      );
+
+      allow create: if isActiveAccount() &&
+        isValidId(sessionId) &&
+        isValidAttendanceSession(incoming()) &&
+        incoming().ownerUid == request.auth.uid &&
+        exists(/databases/$(database)/documents/classes/$(incoming().classId)) &&
+        exists(/databases/$(database)/documents/subjects/$(incoming().subjectId)) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time && (
+          isStaff() || isTeacher()
+        );
+
+      allow update: if isActiveAccount() &&
+        isValidId(sessionId) &&
+        isValidAttendanceSession(incoming()) &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            incoming().ownerUid == existing().ownerUid &&
+            (isKepala() || (isTeacher() && (existing().ownerUid == request.auth.uid || request.auth.uid in existing().accessUids))) &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'recordsJson', 'summaryHadir', 'summaryIzin', 'summarySakit', 'summaryAlpa',
+              'studentUids', 'accessUids', 'teacherName', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isActiveAccount() && isValidId(sessionId) && (
+        isAdmin() || existing().ownerUid == request.auth.uid
+      );
+    }
+
+    match /tasks/{taskId} {
+      allow get: if isActiveAccount() && isValidId(taskId) && (
+        existing().ownerUid == request.auth.uid ||
+        existing().teacherUid == request.auth.uid ||
+        request.auth.uid in existing().accessUids ||
+        request.auth.uid in existing().targetStudentUids ||
+        isStaff()
+      );
+      allow list: if isActiveAccount() && (
+        resource.data.ownerUid == request.auth.uid ||
+        resource.data.teacherUid == request.auth.uid ||
+        request.auth.uid in resource.data.accessUids ||
+        request.auth.uid in resource.data.targetStudentUids ||
+        isStaff()
+      );
+
+      allow create: if isActiveAccount() &&
+        isValidId(taskId) &&
+        isValidTeacherTask(incoming()) &&
+        incoming().ownerUid == request.auth.uid &&
+        exists(/databases/$(database)/documents/classes/$(incoming().classId)) &&
+        exists(/databases/$(database)/documents/subjects/$(incoming().subjectId)) &&
+        (!('onlineClassId' in incoming()) || incoming().onlineClassId == '' || exists(/databases/$(database)/documents/online_classes/$(incoming().onlineClassId))) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time && (
+          isStaff() || isTeacher()
+        );
+
+      allow update: if isActiveAccount() &&
+        isValidId(taskId) &&
+        isValidTeacherTask(incoming()) &&
+        exists(/databases/$(database)/documents/classes/$(incoming().classId)) &&
+        exists(/databases/$(database)/documents/subjects/$(incoming().subjectId)) &&
+        (!('onlineClassId' in incoming()) || incoming().onlineClassId == '' || exists(/databases/$(database)/documents/online_classes/$(incoming().onlineClassId))) &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            incoming().ownerUid == existing().ownerUid &&
+            (isKepala() || existing().ownerUid == request.auth.uid || existing().teacherUid == request.auth.uid || (isTeacher() && request.auth.uid in existing().accessUids)) &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'description', 'paket', 'classId', 'className',
+              'deliveryMode', 'onlineClassId', 'onlineClassTitle',
+              'subjectId', 'subjectName', 'dueAt', 'maxScore',
+              'attachmentsJson', 'targetStudentUids', 'accessUids', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isActiveAccount() && isValidId(taskId) && (
+        isAdmin() || existing().ownerUid == request.auth.uid
+      );
+    }
+
+    match /task_submissions/{submissionId} {
+      allow get: if isActiveAccount() && isValidId(submissionId) && (
+        existing().studentUid == request.auth.uid ||
+        request.auth.uid in existing().accessUids ||
+        isStaff()
+      );
+      allow list: if isActiveAccount() && (
+        resource.data.studentUid == request.auth.uid ||
+        request.auth.uid in resource.data.accessUids ||
+        isStaff()
+      );
+
+      allow create: if isActiveAccount() &&
+        isValidId(submissionId) &&
+        isValidTaskSubmission(incoming()) &&
+        exists(/databases/$(database)/documents/tasks/$(incoming().taskId)) &&
+        incoming().submittedAt == request.time &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            incoming().studentUid == request.auth.uid &&
+            incoming().status in ['Terkumpul', 'Terlambat'] &&
+            incoming().score == 0
+          )
+        );
+
+      allow update: if isActiveAccount() &&
+        isValidId(submissionId) &&
+        isValidTaskSubmission(incoming()) &&
+        incoming().taskId == existing().taskId &&
+        incoming().submittedAt == existing().submittedAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            incoming().studentUid == existing().studentUid &&
+            existing().studentUid == request.auth.uid &&
+            existing().status in ['Terkumpul', 'Terlambat', 'Revisi'] &&
+            incoming().status in ['Terkumpul', 'Terlambat'] &&
+            incoming().score == existing().score &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'answerText', 'attachmentsJson', 'status', 'isLate', 'updatedAt'
+            ])
+          ) ||
+          (
+            incoming().studentUid == existing().studentUid &&
+            (isKepala() || (isTeacher() && request.auth.uid in existing().accessUids)) &&
+            incoming().status in ['Sudah Dinilai', 'Revisi'] &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'score', 'feedback', 'status', 'gradedBy', 'gradedAt', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isAdmin() && isValidId(submissionId);
+    }
+
+    match /grade_weights/{weightId} {
+      allow get: if isActiveAccount() && isValidId(weightId) && (
+        existing().ownerUid == request.auth.uid ||
+        request.auth.uid in existing().accessUids ||
+        isStaff()
+      );
+      allow list: if isActiveAccount() && (
+        resource.data.ownerUid == request.auth.uid ||
+        request.auth.uid in resource.data.accessUids ||
+        isStaff()
+      );
+
+      allow create: if isActiveAccount() &&
+        isValidId(weightId) &&
+        isValidGradeWeightConfig(incoming()) &&
+        incoming().ownerUid == request.auth.uid &&
+        exists(/databases/$(database)/documents/classes/$(incoming().classId)) &&
+        exists(/databases/$(database)/documents/subjects/$(incoming().subjectId)) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time && (
+          isStaff() || isTeacher()
+        );
+
+      allow update: if isActiveAccount() &&
+        isValidId(weightId) &&
+        isValidGradeWeightConfig(incoming()) &&
+        incoming().ownerUid == existing().ownerUid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            (isKepala() || (isTeacher() && (existing().ownerUid == request.auth.uid || request.auth.uid in existing().accessUids))) &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'tugas', 'uh', 'asts', 'asat', 'praktik', 'sikap', 'accessUids', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isAdmin() && isValidId(weightId);
+    }
+
+    match /grade_records/{recordId} {
+      allow get: if isActiveAccount() && isValidId(recordId) && (
+        existing().studentUid == request.auth.uid ||
+        existing().ownerUid == request.auth.uid ||
+        request.auth.uid in existing().accessUids ||
+        isStaff()
+      );
+      allow list: if isActiveAccount() && (
+        resource.data.studentUid == request.auth.uid ||
+        resource.data.ownerUid == request.auth.uid ||
+        request.auth.uid in resource.data.accessUids ||
+        isStaff()
+      );
+
+      allow create: if isActiveAccount() &&
+        isValidId(recordId) &&
+        isValidGradeRecord(incoming()) &&
+        incoming().ownerUid == request.auth.uid &&
+        exists(/databases/$(database)/documents/students/$(incoming().studentId)) &&
+        exists(/databases/$(database)/documents/classes/$(incoming().classId)) &&
+        exists(/databases/$(database)/documents/subjects/$(incoming().subjectId)) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time && (
+          isStaff() || isTeacher()
+        );
+
+      allow update: if isActiveAccount() &&
+        isValidId(recordId) &&
+        isValidGradeRecord(incoming()) &&
+        incoming().studentId == existing().studentId &&
+        incoming().subjectId == existing().subjectId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            incoming().studentUid == existing().studentUid &&
+            incoming().ownerUid == existing().ownerUid &&
+            (isKepala() || (isTeacher() && (existing().ownerUid == request.auth.uid || request.auth.uid in existing().accessUids))) &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'tugas', 'uh', 'asts', 'asat', 'praktik', 'sikap',
+              'finalScore', 'predicate', 'isPassed', 'kkm',
+              'achievementDescription', 'homeroomNote', 'teacherName', 'accessUids', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isAdmin() && isValidId(recordId);
+    }
+
+    match /online_classes/{sessionId} {
+      allow get: if isActiveAccount() && isValidId(sessionId) && (
+        existing().isPublished == true ||
+        existing().ownerUid == request.auth.uid ||
+        request.auth.uid in existing().accessUids ||
+        isStaff()
+      );
+      allow list: if isActiveAccount() && (
+        resource.data.isPublished == true ||
+        resource.data.ownerUid == request.auth.uid ||
+        request.auth.uid in resource.data.accessUids ||
+        isStaff()
+      );
+
+      allow create: if isActiveAccount() &&
+        isValidId(sessionId) &&
+        isValidOnlineClassSession(incoming()) &&
+        incoming().ownerUid == request.auth.uid &&
+        exists(/databases/$(database)/documents/classes/$(incoming().classId)) &&
+        exists(/databases/$(database)/documents/subjects/$(incoming().subjectId)) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time && (
+          isStaff() || isTeacher()
+        );
+
+      allow update: if isActiveAccount() &&
+        isValidId(sessionId) &&
+        isValidOnlineClassSession(incoming()) &&
+        incoming().ownerUid == existing().ownerUid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            (isKepala() || (isTeacher() && (existing().ownerUid == request.auth.uid || request.auth.uid in existing().accessUids))) &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'title', 'paket', 'fase', 'classId', 'className', 'subjectId', 'subjectName',
+              'teacherId', 'teacherName', 'teacherUid', 'modality', 'platform',
+              'meetingUrl', 'meetingCode', 'recordingUrl',
+              'scheduleDate', 'startTime', 'endTime', 'durationMinutes', 'status',
+              'description', 'learningObjectives', 'materials', 'isPublished',
+              'accessUids', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isActiveAccount() && isValidId(sessionId) && (
+        isAdmin() || isKepala() || existing().ownerUid == request.auth.uid
+      );
+    }
+
+    match /online_class_progress/{progressId} {
+      allow get: if isActiveAccount() && isValidId(progressId) && (
+        existing().studentUid == request.auth.uid ||
+        isStaff() ||
+        isTeacher()
+      );
+      allow list: if isActiveAccount() && (
+        resource.data.studentUid == request.auth.uid ||
+        isStaff() ||
+        isTeacher()
+      );
+
+      allow create: if isActiveAccount() &&
+        isValidId(progressId) &&
+        isValidOnlineClassProgress(incoming()) &&
+        exists(/databases/$(database)/documents/online_classes/$(incoming().sessionId)) &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          incoming().studentUid == request.auth.uid
+        );
+
+      allow update: if isActiveAccount() &&
+        isValidId(progressId) &&
+        isValidOnlineClassProgress(incoming()) &&
+        incoming().sessionId == existing().sessionId &&
+        incoming().studentUid == existing().studentUid &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            existing().studentUid == request.auth.uid &&
+            incoming().diff(existing()).affectedKeys().hasOnly([
+              'joinedLive', 'joinedAt', 'completedMaterialIds', 'progressPercent',
+              'personalNote', 'studentName', 'studentNis', 'updatedAt'
+            ])
+          )
+        );
+
+      allow delete: if isAdmin() && isValidId(progressId);
+    }
+
+    match /online_class_comments/{commentId} {
+      allow get: if isActiveAccount() && isValidId(commentId) && (
+        existing().paket in ['Paket A', 'Paket B', 'Paket C'] ||
+        isStaff()
+      );
+      allow list: if isActiveAccount() && (
+        resource.data.paket in ['Paket A', 'Paket B', 'Paket C'] ||
+        isStaff()
+      );
+
+      allow create: if isActiveAccount() &&
+        isValidId(commentId) &&
+        isValidOnlineClassComment(incoming()) &&
+        exists(/databases/$(database)/documents/online_classes/$(incoming().sessionId)) &&
+        incoming().createdAt == request.time &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            incoming().authorUid == request.auth.uid &&
+            (incoming().isPinned == false || isStaff() || isTeacher())
+          )
+        );
+
+      allow update: if isActiveAccount() &&
+        isValidId(commentId) &&
+        isValidOnlineClassComment(incoming()) &&
+        incoming().sessionId == existing().sessionId &&
+        incoming().authorUid == existing().authorUid &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().updatedAt == request.time && (
+          isAdmin() ||
+          (
+            (isKepala() || isTeacher()) &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['isPinned', 'updatedAt'])
+          ) ||
+          (
+            existing().authorUid == request.auth.uid &&
+            incoming().isPinned == existing().isPinned &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['message', 'updatedAt'])
+          )
+        );
+
+      allow delete: if isActiveAccount() && isValidId(commentId) && (
+        isStaff() || isTeacher() || existing().authorUid == request.auth.uid
+      );
+    }
+  }
+}

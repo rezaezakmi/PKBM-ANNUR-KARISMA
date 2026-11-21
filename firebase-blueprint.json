@@ -1,0 +1,1117 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Profil pengguna dan peran akses SIAKAD PKBM Annur Karisma (tanpa menyimpan password).",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "username": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 40,
+          "pattern": "^[a-z0-9._\\-]+$"
+        },
+        "internalEmail": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 160
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "role": {
+          "type": "string",
+          "enum": ["admin", "kepala_pkbm", "guru", "murid"]
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Aktif", "Nonaktif"]
+        },
+        "authVersion": {
+          "type": "number"
+        },
+        "nis": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "nip": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "linkedEntityId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "classLabel": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "avatarUrl": {
+          "type": "string",
+          "maxLength": 120000
+        },
+        "lastLoginAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdBy": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "username", "internalEmail", "name", "role", "status", "authVersion", "createdAt", "updatedAt"]
+    },
+    "AccountLookup": {
+      "title": "AccountLookup",
+      "description": "Koleksi publik minimal pemetaan username ke email internal tanpa PII untuk proses login.",
+      "type": "object",
+      "properties": {
+        "username": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 40,
+          "pattern": "^[a-z0-9._\\-]+$"
+        },
+        "internalEmail": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 160
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["username", "internalEmail", "updatedAt"]
+    },
+    "SystemSetupConfig": {
+      "title": "SystemSetupConfig",
+      "description": "Penanda kunci satu kali bahwa admin pertama PKBM telah dibuat.",
+      "type": "object",
+      "properties": {
+        "adminInitialized": {
+          "type": "boolean"
+        },
+        "initializedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["adminInitialized", "initializedAt"]
+    },
+    "SchoolSettings": {
+      "title": "SchoolSettings",
+      "description": "Pengaturan identitas lembaga, kop surat, TTD, stempel, dan tahun ajaran aktif.",
+      "type": "object",
+      "properties": {
+        "schoolName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 150
+        },
+        "npsn": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "website": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "slogan": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "headmasterName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "headmasterNip": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "academicYear": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "semester": {
+          "type": "string",
+          "enum": ["Ganjil", "Genap"]
+        },
+        "logoUrl": {
+          "type": "string",
+          "maxLength": 350000
+        },
+        "letterheadUrl": {
+          "type": "string",
+          "maxLength": 350000
+        },
+        "headmasterSignatureUrl": {
+          "type": "string",
+          "maxLength": 350000
+        },
+        "teacherSignatureUrl": {
+          "type": "string",
+          "maxLength": 350000
+        },
+        "stampUrl": {
+          "type": "string",
+          "maxLength": 350000
+        },
+        "updatedBy": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["schoolName", "npsn", "address", "headmasterName", "academicYear", "semester", "updatedBy", "updatedAt"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Data warga belajar (murid) Program Paket A, B, dan C.",
+      "type": "object",
+      "properties": {
+        "nis": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 32
+        },
+        "nisn": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "fullName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "gender": {
+          "type": "string",
+          "enum": ["L", "P"]
+        },
+        "paket": {
+          "type": "string",
+          "enum": ["Paket A", "Paket B", "Paket C"]
+        },
+        "classId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "className": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "address": {
+          "type": "string",
+          "maxLength": 250
+        },
+        "guardianName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Aktif", "Cuti", "Lulus", "Nonaktif"]
+        },
+        "ownerUid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "accessUids": {
+          "type": "array"
+        },
+        "createdBy": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["nis", "fullName", "gender", "paket", "classId", "className", "status", "ownerUid", "accessUids", "createdBy", "createdAt", "updatedAt"]
+    },
+    "Teacher": {
+      "title": "Teacher",
+      "description": "Data guru atau tutor PKBM.",
+      "type": "object",
+      "properties": {
+        "nip": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 32
+        },
+        "fullName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "gender": {
+          "type": "string",
+          "enum": ["L", "P"]
+        },
+        "email": {
+          "type": "string",
+          "maxLength": 160
+        },
+        "phone": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "specialization": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "education": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Aktif", "Cuti", "Nonaktif"]
+        },
+        "ownerUid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "accessUids": {
+          "type": "array"
+        },
+        "createdBy": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["nip", "fullName", "gender", "specialization", "status", "ownerUid", "accessUids", "createdBy", "createdAt", "updatedAt"]
+    },
+    "Subject": {
+      "title": "Subject",
+      "description": "Data master mata pelajaran / modul kesetaraan.",
+      "type": "object",
+      "properties": {
+        "code": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 24
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "paket": {
+          "type": "string",
+          "enum": ["Paket A", "Paket B", "Paket C"]
+        },
+        "category": {
+          "type": "string",
+          "enum": ["Wajib", "Pemberdayaan", "Keterampilan"]
+        },
+        "hoursPerWeek": {
+          "type": "number"
+        },
+        "kkm": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Aktif", "Arsip"]
+        },
+        "createdBy": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["code", "name", "paket", "category", "hoursPerWeek", "kkm", "status", "createdBy", "createdAt", "updatedAt"]
+    },
+    "Classroom": {
+      "title": "Classroom",
+      "description": "Data rombongan belajar (rombel) Paket A, B, dan C.",
+      "type": "object",
+      "properties": {
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "paket": {
+          "type": "string",
+          "enum": ["Paket A", "Paket B", "Paket C"]
+        },
+        "gradeLevel": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "homeroomTeacherId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "homeroomTeacherName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "academicYear": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "capacity": {
+          "type": "number"
+        },
+        "studentCount": {
+          "type": "number"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Aktif", "Arsip"]
+        },
+        "createdBy": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["name", "paket", "gradeLevel", "homeroomTeacherName", "academicYear", "capacity", "studentCount", "status", "createdBy", "createdAt", "updatedAt"]
+    },
+    "TeachingAssignment": {
+      "title": "TeachingAssignment",
+      "description": "Penugasan guru ke mata pelajaran dan kelas rombel.",
+      "type": "object",
+      "properties": {
+        "teacherId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "teacherName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "teacherUid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "subjectId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "subjectName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "classId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "className": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "paket": {
+          "type": "string",
+          "enum": ["Paket A", "Paket B", "Paket C"]
+        },
+        "academicYear": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "semester": {
+          "type": "string",
+          "enum": ["Ganjil", "Genap"]
+        },
+        "scheduleDay": {
+          "type": "string",
+          "maxLength": 24
+        },
+        "scheduleTime": {
+          "type": "string",
+          "maxLength": 32
+        },
+        "status": {
+          "type": "string",
+          "enum": ["Aktif", "Selesai"]
+        },
+        "createdBy": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["teacherId", "teacherName", "teacherUid", "subjectId", "subjectName", "classId", "className", "paket", "academicYear", "semester", "scheduleDay", "scheduleTime", "status", "createdBy", "createdAt", "updatedAt"]
+    },
+    "Announcement": {
+      "title": "Announcement",
+      "description": "Pengumuman resmi sekolah pada dashboard.",
+      "type": "object",
+      "properties": {
+        "title": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 140
+        },
+        "content": {
+          "type": "string",
+          "minLength": 5,
+          "maxLength": 1000
+        },
+        "category": {
+          "type": "string",
+          "enum": ["Akademik", "Ujian", "Administrasi", "Kegiatan"]
+        },
+        "targetRole": {
+          "type": "string",
+          "enum": ["Semua", "Guru", "Murid"]
+        },
+        "authorName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "authorId": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "isPinned": {
+          "type": "boolean"
+        },
+        "publishedAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["title", "content", "category", "targetRole", "authorName", "authorId", "isPinned", "publishedAt", "createdAt", "updatedAt"]
+    },
+    "TeachingDocument": {
+      "title": "TeachingDocument",
+      "description": "Dokumen perangkat ajar Kurikulum Merdeka hasil generator AI dan penyuntingan guru.",
+      "type": "object",
+      "properties": {
+        "docType": {
+          "type": "string",
+          "enum": ["CP", "TP_ATP", "KKTP", "PROTA", "PROSEM", "KALDIK", "MODUL_AJAR"]
+        },
+        "title": {
+          "type": "string",
+          "minLength": 3,
+          "maxLength": 160
+        },
+        "paket": {
+          "type": "string",
+          "enum": ["Paket A", "Paket B", "Paket C"]
+        },
+        "fase": {
+          "type": "string",
+          "maxLength": 40
+        },
+        "kelas": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "mapel": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "materi": {
+          "type": "string",
+          "maxLength": 200
+        },
+        "jumlahPertemuan": {
+          "type": "number"
+        },
+        "alokasiWaktu": {
+          "type": "string",
+          "maxLength": 60
+        },
+        "academicYear": {
+          "type": "string",
+          "maxLength": 20
+        },
+        "semester": {
+          "type": "string",
+          "enum": ["Ganjil", "Genap"]
+        },
+        "contentHtml": {
+          "type": "string",
+          "maxLength": 350000
+        },
+        "authorName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "ownerUid": {
+          "type": "string",
+          "maxLength": 128
+        },
+        "accessUids": {
+          "type": "array"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "docType", "title", "paket", "fase", "kelas", "mapel", "materi",
+        "jumlahPertemuan", "alokasiWaktu", "academicYear", "semester",
+        "contentHtml", "authorName", "ownerUid", "accessUids", "createdAt", "updatedAt"
+      ]
+    },
+    "QuestionBankItem": {
+      "title": "QuestionBankItem",
+      "description": "Butir soal tersimpan dalam Bank Soal PKBM untuk berbagai mapel, materi, dan level kognitif.",
+      "type": "object",
+      "properties": {
+        "mapel": { "type": "string", "maxLength": 120 },
+        "paket": { "type": "string", "enum": ["Paket A", "Paket B", "Paket C"] },
+        "materi": { "type": "string", "maxLength": 200 },
+        "questionType": { "type": "string", "enum": ["PG", "PG_KOMPLEKS", "BENAR_SALAH", "MENJODOHKAN", "ISIAN", "URAIAN"] },
+        "cognitiveLevel": { "type": "string", "enum": ["LOTS", "MOTS", "HOTS"] },
+        "questionJson": { "type": "string", "maxLength": 24000 },
+        "visibility": { "type": "string", "enum": ["Sekolah", "Pribadi"] },
+        "authorName": { "type": "string", "maxLength": 120 },
+        "ownerUid": { "type": "string", "maxLength": 128 },
+        "accessUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "mapel", "paket", "materi", "questionType", "cognitiveLevel",
+        "questionJson", "visibility", "authorName", "ownerUid", "accessUids", "createdAt", "updatedAt"
+      ]
+    },
+    "ExamPackage": {
+      "title": "ExamPackage",
+      "description": "Paket naskah ujian lengkap (kisi-kisi, soal Paket A/B, kunci jawaban, pedoman penskoran, dan pengaturan ujian online).",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "maxLength": 160 },
+        "examType": { "type": "string", "enum": ["ASTS", "ASAT", "PAS", "UH"] },
+        "paket": { "type": "string", "enum": ["Paket A", "Paket B", "Paket C"] },
+        "kelas": { "type": "string", "maxLength": 80 },
+        "mapel": { "type": "string", "maxLength": 120 },
+        "materi": { "type": "string", "maxLength": 200 },
+        "academicYear": { "type": "string", "maxLength": 20 },
+        "semester": { "type": "string", "enum": ["Ganjil", "Genap"] },
+        "durationMinutes": { "type": "number" },
+        "hasPaketB": { "type": "boolean" },
+        "isOnlinePublished": { "type": "boolean" },
+        "payloadJson": { "type": "string", "maxLength": 450000 },
+        "authorName": { "type": "string", "maxLength": 120 },
+        "ownerUid": { "type": "string", "maxLength": 128 },
+        "accessUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "title", "examType", "paket", "kelas", "mapel", "materi",
+        "academicYear", "semester", "durationMinutes", "hasPaketB",
+        "isOnlinePublished", "payloadJson", "authorName", "ownerUid", "accessUids", "createdAt", "updatedAt"
+      ]
+    },
+    "ExamSubmission": {
+      "title": "ExamSubmission",
+      "description": "Hasil pengerjaan ujian online murid termasuk skor otomatis PG dan nilai uraian dari guru.",
+      "type": "object",
+      "properties": {
+        "examId": { "type": "string", "maxLength": 128 },
+        "examTitle": { "type": "string", "maxLength": 160 },
+        "paketVariant": { "type": "string", "enum": ["A", "B"] },
+        "studentUid": { "type": "string", "maxLength": 128 },
+        "studentName": { "type": "string", "maxLength": 120 },
+        "studentNis": { "type": "string", "maxLength": 32 },
+        "paket": { "type": "string", "enum": ["Paket A", "Paket B", "Paket C"] },
+        "className": { "type": "string", "maxLength": 80 },
+        "answersJson": { "type": "string", "maxLength": 200000 },
+        "essayGradesJson": { "type": "string", "maxLength": 100000 },
+        "autoScore": { "type": "number" },
+        "essayScore": { "type": "number" },
+        "maxScore": { "type": "number" },
+        "finalScore": { "type": "number" },
+        "status": { "type": "string", "enum": ["Menunggu Nilai Uraian", "Selesai Dinilai"] },
+        "accessUids": { "type": "array" },
+        "submittedAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "examId", "examTitle", "paketVariant", "studentUid", "studentName", "studentNis",
+        "paket", "className", "answersJson", "essayGradesJson", "autoScore", "essayScore",
+        "maxScore", "finalScore", "status", "accessUids", "submittedAt", "updatedAt"
+      ]
+    },
+    "AttendanceSession": {
+      "title": "AttendanceSession",
+      "description": "Catatan presensi harian per kelas, mata pelajaran, dan tanggal beserta ringkasan status Hadir, Izin, Sakit, dan Alpa.",
+      "type": "object",
+      "properties": {
+        "date": { "type": "string", "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$", "minLength": 10, "maxLength": 10 },
+        "monthKey": { "type": "string", "minLength": 7, "maxLength": 7 },
+        "academicYear": { "type": "string", "maxLength": 20 },
+        "semester": { "type": "string", "enum": ["Ganjil", "Genap"] },
+        "paket": { "type": "string", "enum": ["Paket A", "Paket B", "Paket C"] },
+        "classId": { "type": "string", "maxLength": 128 },
+        "className": { "type": "string", "maxLength": 80 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "subjectName": { "type": "string", "maxLength": 120 },
+        "teacherId": { "type": "string", "maxLength": 128 },
+        "teacherName": { "type": "string", "maxLength": 120 },
+        "recordsJson": { "type": "string", "maxLength": 150000 },
+        "summaryHadir": { "type": "number" },
+        "summaryIzin": { "type": "number" },
+        "summarySakit": { "type": "number" },
+        "summaryAlpa": { "type": "number" },
+        "studentUids": { "type": "array" },
+        "ownerUid": { "type": "string", "maxLength": 128 },
+        "accessUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "date", "monthKey", "academicYear", "semester", "paket",
+        "classId", "className", "subjectId", "subjectName",
+        "teacherId", "teacherName", "recordsJson",
+        "summaryHadir", "summaryIzin", "summarySakit", "summaryAlpa",
+        "studentUids", "ownerUid", "accessUids", "createdAt", "updatedAt"
+      ]
+    },
+    "TeacherTask": {
+      "title": "TeacherTask",
+      "description": "Tugas pembelajaran dari guru ke kelas reguler atau kelas online sesuai jenjang Paket A, B, dan C dengan tenggat waktu, nilai maksimal, dan lampiran.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string", "minLength": 3, "maxLength": 160 },
+        "description": { "type": "string", "minLength": 5, "maxLength": 8000 },
+        "paket": { "type": "string", "enum": ["Paket A", "Paket B", "Paket C"] },
+        "classId": { "type": "string", "maxLength": 128 },
+        "className": { "type": "string", "maxLength": 80 },
+        "deliveryMode": { "type": "string", "enum": ["regular", "online"] },
+        "onlineClassId": { "type": "string", "maxLength": 128 },
+        "onlineClassTitle": { "type": "string", "maxLength": 180 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "subjectName": { "type": "string", "maxLength": 120 },
+        "teacherId": { "type": "string", "maxLength": 128 },
+        "teacherName": { "type": "string", "maxLength": 120 },
+        "teacherUid": { "type": "string", "maxLength": 128 },
+        "dueAt": { "type": "string", "minLength": 10, "maxLength": 40 },
+        "maxScore": { "type": "number" },
+        "attachmentsJson": { "type": "string", "maxLength": 750000 },
+        "targetStudentUids": { "type": "array" },
+        "ownerUid": { "type": "string", "maxLength": 128 },
+        "accessUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "title", "description", "paket", "classId", "className",
+        "subjectId", "subjectName", "teacherId", "teacherName", "teacherUid",
+        "dueAt", "maxScore", "attachmentsJson", "targetStudentUids",
+        "ownerUid", "accessUids", "createdAt", "updatedAt"
+      ]
+    },
+    "TaskSubmission": {
+      "title": "TaskSubmission",
+      "description": "Pengumpulan jawaban tugas oleh warga belajar termasuk lampiran file, status pengumpulan, nilai, dan komentar revisi/penilaian guru.",
+      "type": "object",
+      "properties": {
+        "taskId": { "type": "string", "maxLength": 128 },
+        "taskTitle": { "type": "string", "maxLength": 160 },
+        "classId": { "type": "string", "maxLength": 128 },
+        "className": { "type": "string", "maxLength": 80 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "subjectName": { "type": "string", "maxLength": 120 },
+        "studentId": { "type": "string", "maxLength": 128 },
+        "studentUid": { "type": "string", "maxLength": 128 },
+        "studentName": { "type": "string", "maxLength": 120 },
+        "studentNis": { "type": "string", "maxLength": 32 },
+        "answerText": { "type": "string", "maxLength": 15000 },
+        "attachmentsJson": { "type": "string", "maxLength": 750000 },
+        "status": { "type": "string", "enum": ["Terkumpul", "Terlambat", "Revisi", "Sudah Dinilai"] },
+        "isLate": { "type": "boolean" },
+        "score": { "type": "number" },
+        "feedback": { "type": "string", "maxLength": 4000 },
+        "gradedBy": { "type": "string", "maxLength": 120 },
+        "gradedAt": { "type": "string", "maxLength": 40 },
+        "accessUids": { "type": "array" },
+        "submittedAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "taskId", "taskTitle", "classId", "className", "subjectId", "subjectName",
+        "studentId", "studentUid", "studentName", "studentNis", "answerText",
+        "attachmentsJson", "status", "isLate", "score", "feedback",
+        "gradedBy", "gradedAt", "accessUids", "submittedAt", "updatedAt"
+      ]
+    },
+    "GradeWeightConfig": {
+      "title": "GradeWeightConfig",
+      "description": "Pengaturan bobot komponen penilaian (Tugas, UH, ASTS, ASAT, Praktik, Sikap) per kelas dan mata pelajaran.",
+      "type": "object",
+      "properties": {
+        "classId": { "type": "string", "maxLength": 128 },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "tugas": { "type": "number" },
+        "uh": { "type": "number" },
+        "asts": { "type": "number" },
+        "asat": { "type": "number" },
+        "praktik": { "type": "number" },
+        "sikap": { "type": "number" },
+        "ownerUid": { "type": "string", "maxLength": 128 },
+        "accessUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "classId", "subjectId", "tugas", "uh", "asts", "asat", "praktik", "sikap",
+        "ownerUid", "accessUids", "createdAt", "updatedAt"
+      ]
+    },
+    "GradeRecord": {
+      "title": "GradeRecord",
+      "description": "Rekam nilai akademik per murid dan mata pelajaran (Tugas, UH, ASTS, ASAT, Praktik, Sikap, Nilai Akhir, KKTP, dan Deskripsi Capaian).",
+      "type": "object",
+      "properties": {
+        "studentId": { "type": "string", "maxLength": 128 },
+        "studentUid": { "type": "string", "maxLength": 128 },
+        "studentName": { "type": "string", "maxLength": 120 },
+        "studentNis": { "type": "string", "maxLength": 32 },
+        "classId": { "type": "string", "maxLength": 128 },
+        "className": { "type": "string", "maxLength": 80 },
+        "paket": { "type": "string", "enum": ["Paket A", "Paket B", "Paket C"] },
+        "subjectId": { "type": "string", "maxLength": 128 },
+        "subjectName": { "type": "string", "maxLength": 120 },
+        "kkm": { "type": "number" },
+        "teacherId": { "type": "string", "maxLength": 128 },
+        "teacherName": { "type": "string", "maxLength": 120 },
+        "academicYear": { "type": "string", "maxLength": 20 },
+        "semester": { "type": "string", "enum": ["Ganjil", "Genap"] },
+        "tugas": { "type": "number" },
+        "uh": { "type": "number" },
+        "asts": { "type": "number" },
+        "asat": { "type": "number" },
+        "praktik": { "type": "number" },
+        "sikap": { "type": "number" },
+        "finalScore": { "type": "number" },
+        "predicate": { "type": "string", "enum": ["A", "B", "C", "D"] },
+        "isPassed": { "type": "boolean" },
+        "achievementDescription": { "type": "string", "maxLength": 2000 },
+        "homeroomNote": { "type": "string", "maxLength": 1000 },
+        "ownerUid": { "type": "string", "maxLength": 128 },
+        "accessUids": { "type": "array" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "studentId", "studentUid", "studentName", "studentNis",
+        "classId", "className", "paket", "subjectId", "subjectName", "kkm",
+        "teacherId", "teacherName", "academicYear", "semester",
+        "tugas", "uh", "asts", "asat", "praktik", "sikap",
+        "finalScore", "predicate", "isPassed", "achievementDescription", "homeroomNote",
+        "ownerUid", "accessUids", "createdAt", "updatedAt"
+      ]
+    },
+    "LoginCardCredential": {
+      "title": "LoginCardCredential",
+      "description": "Catatan kredensial cetak kartu login (khusus Admin) agar password kartu tetap tampil saat mencetak lintas perangkat.",
+      "type": "object",
+      "properties": {
+        "uid": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "username": { "type": "string", "minLength": 3, "maxLength": 40, "pattern": "^[a-z0-9._\\-]+$" },
+        "name": { "type": "string", "minLength": 2, "maxLength": 120 },
+        "role": { "type": "string", "enum": ["admin", "kepala_pkbm", "guru", "murid"] },
+        "classLabel": { "type": "string", "maxLength": 120 },
+        "cardPassword": { "type": "string", "minLength": 6, "maxLength": 64 },
+        "updatedBy": { "type": "string", "minLength": 1, "maxLength": 128, "pattern": "^[a-zA-Z0-9_\\-]+$" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["uid", "username", "name", "role", "cardPassword", "updatedBy", "updatedAt"]
+    },
+    "OnlineClassSession": {
+      "title": "OnlineClassSession",
+      "description": "Ruang kelas online Paket A, B, dan C lengkap dengan tautan tatap muka daring, jadwal, tujuan pembelajaran, dan daftar modul belajar mandiri.",
+      "type": "object",
+      "properties": {
+        "title": { "type": "string" },
+        "paket": { "type": "string", "enum": ["Paket A", "Paket B", "Paket C"] },
+        "fase": { "type": "string" },
+        "classId": { "type": "string" },
+        "className": { "type": "string" },
+        "subjectId": { "type": "string" },
+        "subjectName": { "type": "string" },
+        "teacherId": { "type": "string" },
+        "teacherName": { "type": "string" },
+        "teacherUid": { "type": "string" },
+        "modality": { "type": "string", "enum": ["Live Interaktif", "Tutorial Daring", "Belajar Mandiri"] },
+        "platform": { "type": "string", "enum": ["Google Meet", "Zoom Meeting", "YouTube Live", "Ruang Belajar Mandiri"] },
+        "meetingUrl": { "type": "string" },
+        "meetingCode": { "type": "string" },
+        "recordingUrl": { "type": "string" },
+        "scheduleDate": { "type": "string" },
+        "startTime": { "type": "string" },
+        "endTime": { "type": "string" },
+        "durationMinutes": { "type": "number" },
+        "status": { "type": "string", "enum": ["Terjadwal", "Live", "Selesai"] },
+        "description": { "type": "string" },
+        "learningObjectives": { "type": "array", "items": { "type": "string" } },
+        "materials": { "type": "array", "items": { "type": "object" } },
+        "isPublished": { "type": "boolean" },
+        "ownerUid": { "type": "string" },
+        "accessUids": { "type": "array", "items": { "type": "string" } },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "title", "paket", "fase", "classId", "className", "subjectId", "subjectName",
+        "teacherId", "teacherName", "teacherUid", "modality", "platform", "meetingUrl",
+        "meetingCode", "recordingUrl", "scheduleDate", "startTime", "endTime",
+        "durationMinutes", "status", "description", "learningObjectives", "materials",
+        "isPublished", "ownerUid", "accessUids", "createdAt", "updatedAt"
+      ]
+    },
+    "OnlineClassProgress": {
+      "title": "OnlineClassProgress",
+      "description": "Rekam kehadiran daring, progres penyelesaian modul belajar, dan catatan pribadi warga belajar di kelas online.",
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" },
+        "paket": { "type": "string", "enum": ["Paket A", "Paket B", "Paket C"] },
+        "classId": { "type": "string" },
+        "studentId": { "type": "string" },
+        "studentUid": { "type": "string" },
+        "studentName": { "type": "string" },
+        "studentNis": { "type": "string" },
+        "joinedLive": { "type": "boolean" },
+        "joinedAt": { "type": "string" },
+        "completedMaterialIds": { "type": "array", "items": { "type": "string" } },
+        "progressPercent": { "type": "number" },
+        "personalNote": { "type": "string" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "sessionId", "paket", "classId", "studentId", "studentUid", "studentName",
+        "studentNis", "joinedLive", "joinedAt", "completedMaterialIds",
+        "progressPercent", "personalNote", "updatedAt"
+      ]
+    },
+    "OnlineClassComment": {
+      "title": "OnlineClassComment",
+      "description": "Forum diskusi dan tanya jawab antara tutor dan warga belajar pada setiap sesi kelas online.",
+      "type": "object",
+      "properties": {
+        "sessionId": { "type": "string" },
+        "paket": { "type": "string", "enum": ["Paket A", "Paket B", "Paket C"] },
+        "authorUid": { "type": "string" },
+        "authorName": { "type": "string" },
+        "authorRole": { "type": "string", "enum": ["admin", "kepala_pkbm", "guru", "murid"] },
+        "message": { "type": "string" },
+        "isPinned": { "type": "boolean" },
+        "createdAt": { "type": "string", "format": "date-time" },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": [
+        "sessionId", "paket", "authorUid", "authorName", "authorRole",
+        "message", "isPinned", "createdAt", "updatedAt"
+      ]
+    },
+    "GalleryPhoto": {
+      "title": "GalleryPhoto",
+      "description": "5 slot foto dokumentasi kegiatan belajar mengajar publik tanpa PII untuk laman depan.",
+      "type": "object",
+      "properties": {
+        "slotIndex": { "type": "integer", "minimum": 1, "maximum": 5 },
+        "title": { "type": "string", "minLength": 2, "maxLength": 100 },
+        "caption": { "type": "string", "maxLength": 240 },
+        "paketLabel": { "type": "string", "maxLength": 40 },
+        "imageUrl": { "type": "string", "maxLength": 240000 },
+        "updatedBy": { "type": "string", "maxLength": 128 },
+        "updatedAt": { "type": "string", "format": "date-time" }
+      },
+      "required": ["slotIndex", "title", "caption", "paketLabel", "imageUrl", "updatedBy", "updatedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Profil pengguna, status aktif/nonaktif, dan tautan entitas SIAKAD."
+    },
+    "/account_lookups/{username}": {
+      "schema": { "$ref": "#/entities/AccountLookup" },
+      "description": "Pemetaan minimal username ke email internal untuk login."
+    },
+    "/login_card_credentials/{cardId}": {
+      "schema": { "$ref": "#/entities/LoginCardCredential" },
+      "description": "Penyimpanan khusus Admin untuk kredensial cetak kartu login agar password tampil jelas."
+    },
+    "/system_config/{configId}": {
+      "schema": { "$ref": "#/entities/SystemSetupConfig" },
+      "description": "Konfigurasi kunci setup admin pertama."
+    },
+    "/school_settings/{settingId}": {
+      "schema": { "$ref": "#/entities/SchoolSettings" },
+      "description": "Konfigurasi identitas lembaga PKBM dan kop surat."
+    },
+    "/school_branding/{brandingId}": {
+      "schema": {
+        "title": "SchoolBranding",
+        "description": "Identitas dan logo publik lembaga tanpa PII untuk halaman login dan pengguna masuk.",
+        "type": "object"
+      },
+      "description": "Logo dan identitas publik lembaga PKBM tanpa PII."
+    },
+    "/gallery_photos/{photoId}": {
+      "schema": { "$ref": "#/entities/GalleryPhoto" },
+      "description": "5 slot foto kegiatan belajar mengajar publik (slot_1 s.d. slot_5) untuk laman depan."
+    },
+    "/students/{studentId}": {
+      "schema": { "$ref": "#/entities/Student" },
+      "description": "Koleksi data induk warga belajar (murid)."
+    },
+    "/teachers/{teacherId}": {
+      "schema": { "$ref": "#/entities/Teacher" },
+      "description": "Koleksi data induk guru dan tutor."
+    },
+    "/subjects/{subjectId}": {
+      "schema": { "$ref": "#/entities/Subject" },
+      "description": "Koleksi mata pelajaran Paket A, B, dan C."
+    },
+    "/classes/{classId}": {
+      "schema": { "$ref": "#/entities/Classroom" },
+      "description": "Koleksi kelas dan rombongan belajar."
+    },
+    "/assignments/{assignmentId}": {
+      "schema": { "$ref": "#/entities/TeachingAssignment" },
+      "description": "Koleksi penugasan guru ke mata pelajaran dan kelas."
+    },
+    "/announcements/{announcementId}": {
+      "schema": { "$ref": "#/entities/Announcement" },
+      "description": "Koleksi pengumuman resmi lembaga."
+    },
+    "/teaching_documents/{docId}": {
+      "schema": { "$ref": "#/entities/TeachingDocument" },
+      "description": "Koleksi riwayat perangkat ajar Kurikulum Merdeka yang tersimpan."
+    },
+    "/question_bank/{questionId}": {
+      "schema": { "$ref": "#/entities/QuestionBankItem" },
+      "description": "Koleksi Bank Soal PKBM lintas mata pelajaran dan level kognitif."
+    },
+    "/exams/{examId}": {
+      "schema": { "$ref": "#/entities/ExamPackage" },
+      "description": "Koleksi paket soal ujian cetak dan ujian online."
+    },
+    "/exam_submissions/{submissionId}": {
+      "schema": { "$ref": "#/entities/ExamSubmission" },
+      "description": "Koleksi jawaban dan nilai ujian online murid."
+    },
+    "/attendance_sessions/{sessionId}": {
+      "schema": { "$ref": "#/entities/AttendanceSession" },
+      "description": "Koleksi sesi presensi harian warga belajar per kelas, mapel, dan tanggal."
+    },
+    "/tasks/{taskId}": {
+      "schema": { "$ref": "#/entities/TeacherTask" },
+      "description": "Koleksi tugas pembelajaran yang diberikan guru per kelas dan mata pelajaran."
+    },
+    "/task_submissions/{submissionId}": {
+      "schema": { "$ref": "#/entities/TaskSubmission" },
+      "description": "Koleksi jawaban tugas murid beserta penilaian dan permintaan revisi dari guru."
+    },
+    "/grade_weights/{weightId}": {
+      "schema": { "$ref": "#/entities/GradeWeightConfig" },
+      "description": "Koleksi pengaturan bobot komponen nilai per kelas dan mata pelajaran."
+    },
+    "/grade_records/{recordId}": {
+      "schema": { "$ref": "#/entities/GradeRecord" },
+      "description": "Koleksi rekam nilai mata pelajaran, nilai akhir KKTP, dan deskripsi capaian rapor murid."
+    },
+    "/online_classes/{sessionId}": {
+      "schema": { "$ref": "#/entities/OnlineClassSession" },
+      "description": "Koleksi ruang kelas online Paket A, B, dan C beserta tautan tatap muka daring dan modul belajar."
+    },
+    "/online_class_progress/{progressId}": {
+      "schema": { "$ref": "#/entities/OnlineClassProgress" },
+      "description": "Koleksi rekam kehadiran kelas online, progres modul, dan catatan belajar warga belajar."
+    },
+    "/online_class_comments/{commentId}": {
+      "schema": { "$ref": "#/entities/OnlineClassComment" },
+      "description": "Koleksi forum diskusi dan tanya jawab tutor pada kelas online."
+    }
+  }
+}
